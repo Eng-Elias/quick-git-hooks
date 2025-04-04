@@ -112,17 +112,38 @@ Where:
 
 ## Common Commands
 
+### Hook Installation
+
 ```bash
-# Install hooks
+# Install hooks (done automatically by quick-git-hooks setup)
 pre-commit install --hook-type pre-commit
 pre-commit install --hook-type commit-msg
 pre-commit install --hook-type pre-push
+```
 
-# Run hooks manually
+or you can rerun `quick-git-hooks setup`
+
+### Running Hooks Manually
+
+Using quick-git-hooks:
+
+```bash
+# Run on all files
+quick-git-hooks run hooks
+```
+
+Using pre-commit directly:
+
+```bash
+# Run all hooks on staged files
+pre-commit run
+
+# Run all hooks on all files
 pre-commit run --all-files
 
 # Skip hooks (use sparingly)
 git commit --no-verify
+git push --no-verify
 ```
 
 ## Additional Resources

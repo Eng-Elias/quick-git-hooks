@@ -293,9 +293,33 @@ def _check_files() -> tuple[list[str], list[str], list[str], bool]:
     return success_msgs, warning_msgs, error_msgs, issues_found
 
 
+def _run_hooks() -> bool:
+    """
+    Runs all git hooks.
+
+    Returns:
+        bool: True if hooks passed, False if any failed.
+    """
+    if not command_exists("pre-commit"):
+        click.secho("❌ pre-commit not found. Please run setup first.", fg="red")
+        return False
+
+    if not TARGET_CONFIG_FILE.exists():
+        click.secho("❌ .pre-commit-config.yaml not found. Please run setup first.", fg="red")
+        return False
+
+    # Build command
+    cmd = ["pre-commit", "run", "--all-files"]
+
+    # Run hooks
+    ok, _, err = run_command(cmd)
+    if not ok:
+        click.secho(f"❌ Hooks failed: {err}", fg="red")
+        return False
+    return True
+
+
 # --- CLI Command Group ---
-
-
 @click.group()
 @click.version_option(package_name="quick_git_hooks")
 def cli():
@@ -389,6 +413,23 @@ def check():
         click.echo("   Please review the warnings above and install/configure as needed.")
     else:
         click.secho("\n❌ Issues found with the setup. Please fix the errors listed above.", fg="red")
+
+
+# --- Run Command Group ---
+
+
+@cli.group()
+def run():
+    """Run git hooks manually without committing or pushing."""
+    pass
+
+
+@run.command()
+def hooks():
+    """Run pre-commit hooks manually."""
+    click.echo("🔍 Running all git hooks hooks...")
+    if _run_hooks():
+        click.secho("✅ Pre-commit hooks passed!", fg="green")
 
 
 if __name__ == "__main__":
