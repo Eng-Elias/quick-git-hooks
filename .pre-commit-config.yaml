@@ -1,0 +1,90 @@
+# .pre-commit-config.yaml
+# Default configuration provided by quick-git-hooks
+# Customize this file to your project's needs.
+
+# IMPORTANT: Ensure the tools used below (flake8, black, isort, prettier, eslint, commitizen)
+# are installed in your project's environment or globally.
+# Run `quick-git-hooks check` to verify.
+
+repos:
+  # ... (pre-commit-hooks remain the same) ...
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Python specific hooks (install black, flake8, isort)
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=120]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        args: [
+            "--max-line-length=120",
+            "--extend-ignore=E203", # Conflicts with black
+            "--exclude=.git,__pycache__,build,dist",
+            "--max-complexity=10",
+          ]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ["--profile", "black"]
+
+  # JavaScript/TypeScript specific hooks (install prettier, eslint, plugins)
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8 # Or pin to your project's version
+    hooks:
+      - id: prettier
+        types_or:
+          [javascript, jsx, ts, tsx, css, scss, html, json, yaml, markdown]
+        # Requires: npm/yarn install --save-dev prettier
+        # Requires: .prettierrc.* configuration file
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.6.0 # Or pin to your project's version
+    hooks:
+      - id: eslint
+        types_or: [javascript, jsx, ts, tsx]
+        # Requires: npm/yarn install --save-dev eslint [plugins/parsers...]
+        # Requires: .eslintrc.* configuration file
+        # Add necessary parser/plugins (e.g., @typescript-eslint/parser) here:
+        # additional_dependencies: ['@typescript-eslint/parser@latest', '@typescript-eslint/eslint-plugin@latest']
+        args: [--fix] # Attempt to fix issues automatically
+
+  # Branch naming convention hook (Example)
+  # ... (hook remains the same) ...
+  - repo: local
+    hooks:
+      - id: branch-name-check
+        name: Check branch naming convention
+        entry: bash -c 'branch=$(git rev-parse --abbrev-ref HEAD); if ! [[ "$branch" =~ ^(main|master|develop|QA|(feature|bugfix|hotfix|release)/issue#[0-9]+-.+)$ ]]; then echo "Branch name must match main|master|develop|QA or pattern (feature|bugfix|hotfix|release)/issue#<number>-description-in-kebab-case" && exit 1; fi; exit 0;'
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+
+  # Commit message hook (Requires commitizen)
+  # ... (hook remains the same) ...
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.2.2
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+        # Requires: pip install commitizen
+        # Requires: commitizen configuration (e.g., in pyproject.toml or run `commitizen init`)

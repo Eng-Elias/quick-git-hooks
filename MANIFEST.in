@@ -1,0 +1,2 @@
+include src/quick_git_hooks/templates/.pre-commit-config.yaml
+include src/quick_git_hooks/templates/__init__.py

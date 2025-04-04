@@ -1,0 +1,56 @@
+# pyproject.toml
+[build-system]
+# Added importlib-resources as required for Python < 3.9
+requires = ["setuptools>=61.0", "wheel", "importlib-resources; python_version<'3.9'"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quick_git_hooks"
+version = "0.1.0" # Increment version
+description = "A CLI tool to quickly set up and check pre-commit Git hooks for Python, JS, and TS projects."
+readme = "README.md"
+authors = [
+    { name = "Eng. Elias Owis", email = "elias@engelias.website" },
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 4 - Beta", # Updated status
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+]
+keywords = ["git", "hooks", "pre-commit", "linting", "formatting", "python", "javascript", "typescript", "cli", "setup", "check"]
+
+# Core dependencies
+dependencies = [
+    "click >= 8.0",
+    "pre-commit >= 3.0",
+    "importlib-resources >= 1.3; python_version<'3.9'",
+]
+
+[project.urls]
+Homepage = "https://github.com/Eng-Elias/quick-git-hooks"
+Repository = "https://github.com/Eng-Elias/quick-git-hooks"
+
+# CLI entry points (group and commands)
+[project.scripts]
+quick-git-hooks = "quick_git_hooks.cli:cli"
+
+# Package data
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["quick_git_hooks*"]
+
+[tool.setuptools.package-data]
+"quick_git_hooks.templates" = [".pre-commit-config.yaml"]
