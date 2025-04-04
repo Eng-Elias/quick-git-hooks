@@ -53,4 +53,4 @@ where = ["src"]
 include = ["quick_git_hooks*"]
 
 [tool.setuptools.package-data]
-"quick_git_hooks.templates" = [".pre-commit-config.yaml"]
+"quick_git_hooks.templates" = [".pre-commit-config.yaml", "GIT_HOOKS_GUIDE.md"]

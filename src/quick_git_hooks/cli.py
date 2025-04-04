@@ -28,79 +28,46 @@ from .utils import (
 # --- Helper for Setup ---
 
 
-def _copy_config(overwrite: bool) -> bool:
-    """Copies the pre-commit config file."""
+def _copy_template_files(overwrite: bool) -> tuple[bool, bool]:
+    """Copies template files to the target directory.
+
+    Returns:
+        Tuple of (config_copied, guide_copied)
+    """
+    config_copied = False
+    guide_copied = False
+
     try:
         files = pkg_resources.files("quick_git_hooks.templates")
-        template_path = files / ".pre-commit-config.yaml"
 
-        # Check if target file exists
-        if TARGET_CONFIG_FILE.exists() and not overwrite:
-            click.secho(f"⚠️ '{TARGET_CONFIG_FILE}' already exists. Use --overwrite to replace it.", fg="yellow")
-            click.echo("Skipping config file creation.")
-            return True  # Not an error state, just skipping
-
-        # Read template content
-        template_content = template_path.read_text(encoding="utf-8")
-
-        # If no package.json, remove JS/TS hooks
-        if not PACKAGE_JSON.exists():
-            # Split content into sections and remove JS/TS section
-            parts = template_content.split("\n  # JavaScript/TypeScript specific hooks")
-            if len(parts) > 1:
-                before_js = parts[0]
-                after_js = parts[1].split("\n  # Branch naming convention")[1]
-                template_content = before_js + "\n  # Branch naming convention" + after_js
-                click.echo("ℹ️  No package.json found, skipping JavaScript/TypeScript hooks.")
+        # Copy config file
+        config_template = files / ".pre-commit-config.yaml"
+        if not TARGET_CONFIG_FILE.exists() or overwrite:
+            config_text = config_template.read_text()
+            TARGET_CONFIG_FILE.write_text(config_text)
+            click.secho("✅ Created .pre-commit-config.yaml", fg="green")
+            config_copied = True
         else:
-            # If we have package.json, ensure config files exist
-            if not find_config_file(ESLINTRC_GLOB):
-                # Create basic .eslintrc.json
-                Path(".eslintrc.json").write_text(
-                    """{
-  "env": {
-    "browser": true,
-    "es2021": true,
-    "node": true
-  },
-  "extends": ["eslint:recommended"],
-  "parserOptions": {
-    "ecmaVersion": "latest",
-    "sourceType": "module"
-  },
-  "rules": {
-    "indent": ["error", 2],
-    "linebreak-style": ["error", "unix"],
-    "quotes": ["error", "single"],
-    "semi": ["error", "always"]
-  }
-}""",
-                    encoding="utf-8",
-                )
-                click.echo("✅ Created basic .eslintrc.json configuration.")
+            click.secho("⚠️ '.pre-commit-config.yaml' already exists. Use --overwrite to replace it.", fg="yellow")
+            click.echo("Skipping config file creation.")
 
-            if not find_config_file(PRETTIERRC_GLOB):
-                # Create basic .prettierrc
-                Path(".prettierrc").write_text(
-                    """{
-  "semi": true,
-  "singleQuote": true,
-  "tabWidth": 2,
-  "trailingComma": "es5"
-}""",
-                    encoding="utf-8",
-                )
-                click.echo("✅ Created basic .prettierrc configuration.")
-
-        # Write modified content
-        TARGET_CONFIG_FILE.write_text(template_content, encoding="utf-8")
-        action = "Overwrote" if overwrite and TARGET_CONFIG_FILE.exists() else "Created"
-        click.echo(f"✅ {action} '{TARGET_CONFIG_FILE}' from template.")
-        return True
+        # Copy guide file
+        guide_template = files / "GIT_HOOKS_GUIDE.md"
+        guide_target = Path("GIT_HOOKS_GUIDE.md")
+        if not guide_target.exists() or overwrite:
+            guide_text = guide_template.read_text()
+            guide_target.write_text(guide_text)
+            click.secho("✅ Created GIT_HOOKS_GUIDE.md", fg="green")
+            guide_copied = True
+        else:
+            click.secho("⚠️ 'GIT_HOOKS_GUIDE.md' already exists. Use --overwrite to replace it.", fg="yellow")
+            click.echo("Skipping guide file creation.")
 
     except Exception as e:
-        click.secho(f"Error: Failed to copy config file: {e}", fg="red")
-        return False
+        click.secho(f"Error copying template files: {str(e)}", fg="red")
+        return False, False
+
+    return config_copied, guide_copied
 
 
 def _install_python_tools() -> bool:
@@ -302,6 +269,30 @@ def _check_tools() -> tuple[list[str], list[str], list[str], bool]:
     return success_msgs, warning_msgs, error_msgs, issues_found
 
 
+def _check_files() -> tuple[list[str], list[str], list[str], bool]:
+    """Check required files and return messages and status."""
+    success_msgs = []
+    warning_msgs = []
+    error_msgs = []
+    issues_found = False
+
+    # Check config file
+    if not TARGET_CONFIG_FILE.exists():
+        error_msgs.append(f"❌ '{TARGET_CONFIG_FILE}' not found. Run setup first.")
+        issues_found = True
+    else:
+        success_msgs.append(f"✅ '{TARGET_CONFIG_FILE}' found.")
+
+    # Check guide file
+    guide_file = Path("GIT_HOOKS_GUIDE.md")
+    if not guide_file.exists():
+        warning_msgs.append("⚠️ 'GIT_HOOKS_GUIDE.md' not found. Run setup to get the documentation.")
+    else:
+        success_msgs.append("✅ 'GIT_HOOKS_GUIDE.md' found.")
+
+    return success_msgs, warning_msgs, error_msgs, issues_found
+
+
 # --- CLI Command Group ---
 
 
@@ -316,7 +307,7 @@ def cli():
 
 
 @cli.command()
-@click.option("--overwrite", is_flag=True, help="Overwrite existing config file if it exists.")
+@click.option("--overwrite", is_flag=True, help="Overwrite existing config and guide files if they exist.")
 def setup(overwrite: bool):
     """Sets up pre-commit hooks for Python, JS, and TS projects."""
     click.echo("🚀 Starting Git hooks setup...")
@@ -327,8 +318,8 @@ def setup(overwrite: bool):
         sys.exit(1)
     click.secho("✅ Git repository detected.", fg="green")
 
-    # Copy config file
-    config_copied = _copy_config(overwrite)
+    # Copy template files
+    config_copied, guide_copied = _copy_template_files(overwrite)
     if not config_copied and not TARGET_CONFIG_FILE.exists():
         click.secho("❌ Failed to create config file. Aborting.", fg="red")
         sys.exit(1)
@@ -349,6 +340,11 @@ def setup(overwrite: bool):
     click.secho("\n🎉 Setup process complete!", fg="green")
     if hooks_installed:
         click.echo("   Hooks are installed. Please review any instructions above for missing tools.")
+        if guide_copied:
+            click.echo("\n📖 Check out GIT_HOOKS_GUIDE.md for detailed information about:")
+            click.echo("   - Pre-configured git hooks")
+            click.echo("   - Recommended branching strategy")
+            click.echo("   - How to customize hooks")
 
     click.echo("\n💡 Tip: You can customize the hooks by editing .pre-commit-config.yaml")
     click.echo("   After customizing, run 'pre-commit install' to apply your changes.")
@@ -370,7 +366,7 @@ def check():
     has_issues = False
 
     # Run all checks
-    for check_func in [_check_git_repo, _check_pre_commit, _check_hooks, _check_tools]:
+    for check_func in [_check_git_repo, _check_files, _check_pre_commit, _check_hooks, _check_tools]:
         success, warnings, errors, issues = check_func()
         all_success.extend(success)
         all_warnings.extend(warnings)
