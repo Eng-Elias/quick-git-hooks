@@ -1,9 +1,15 @@
-import shutil
+import os
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import click
+
+try:
+    from importlib.resources import files
+except ImportError:
+    # For Python < 3.9
+    from importlib_resources import files
 
 # --- Constants ---
 TARGET_CONFIG_FILE = Path(".pre-commit-config.yaml")
@@ -15,19 +21,28 @@ ESLINTRC_GLOB = ".eslintrc.*"  # Glob pattern for eslint config
 HOOK_TYPES = ["pre-commit", "commit-msg", "pre-push"]
 
 PYTHON_TOOLS = {
-    "black": "pip install black",
-    "flake8": "pip install flake8",
-    "isort": "pip install isort",
-    "commitizen": "pip install commitizen",  # Check for 'cz' command
+    "black": {"command": "black", "install": "pip install black", "packages": ["black"]},
+    "flake8": {"command": "flake8", "install": "pip install flake8", "packages": ["flake8"]},
+    "isort": {"command": "isort", "install": "pip install isort", "packages": ["isort"]},
+    "commitizen": {"command": "cz", "install": "pip install commitizen", "packages": ["commitizen"]},
 }
 
 JS_TOOLS = {
-    "prettier": "npm install --save-dev prettier",  # or yarn add --dev prettier
-    "eslint": "npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin",
+    "prettier": {"command": "prettier", "install": "npm install -g prettier", "packages": ["prettier"]},
+    "eslint": {
+        "command": "eslint",
+        "install": "npm install -g eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin",
+        "packages": ["eslint", "@typescript-eslint/parser", "@typescript-eslint/eslint-plugin"],
+    },
 }
 
 
 # --- Helper Functions ---
+
+
+def get_template_path() -> Path:
+    """Get the path to the templates directory."""
+    return files("quick_git_hooks.templates")
 
 
 def is_git_repo() -> bool:
@@ -37,7 +52,15 @@ def is_git_repo() -> bool:
 
 def command_exists(command: str) -> bool:
     """Check if a command exists in the system's PATH."""
-    return shutil.which(command) is not None
+    try:
+        # Use 'where' on Windows, which is equivalent to 'which' on Unix
+        cmd = ["where" if os.name == "nt" else "which", command]
+        result = subprocess.run(
+            " ".join(cmd), shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
+        )
+        return bool(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 
 def run_command(command: List[str], cwd: Optional[Path] = None, suppress_output: bool = False) -> Tuple[bool, str, str]:
@@ -45,7 +68,17 @@ def run_command(command: List[str], cwd: Optional[Path] = None, suppress_output:
     Runs a shell command and returns success status, stdout, and stderr.
     """
     try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True, cwd=cwd, encoding="utf-8")
+        # Convert command list to string for Windows shell compatibility
+        cmd_str = " ".join(command)
+        result = subprocess.run(
+            cmd_str,
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            encoding="utf-8",
+            shell=True,  # Use shell=True for Windows compatibility
+        )
         if not suppress_output:
             if result.stdout:
                 click.echo(result.stdout.strip())

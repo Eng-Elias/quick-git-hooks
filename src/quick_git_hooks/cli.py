@@ -1,5 +1,8 @@
-"""Command line interface for quick-git-hooks."""
+"""Command-line interface for quick-git-hooks."""
 
+import glob
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -11,16 +14,13 @@ except ImportError:
     import importlib_resources as pkg_resources  # type: ignore
 
 from .utils import (
-    ESLINTRC_GLOB,
     HOOK_TYPES,
     JS_TOOLS,
-    PACKAGE_JSON,
-    PRETTIERRC_GLOB,
     PYTHON_TOOLS,
     TARGET_CONFIG_FILE,
     check_hook_installed,
     command_exists,
-    find_config_file,
+    get_template_path,
     is_git_repo,
     run_command,
 )
@@ -117,66 +117,110 @@ def _check_python_tools() -> tuple[list[str], bool]:
     """Check Python tools and return any missing tools and overall status."""
     missing_tools = []
     all_tools_ok = True
-    for tool, install_cmd in PYTHON_TOOLS.items():
-        check_cmd = "cz" if tool == "commitizen" else tool
+    for tool, info in PYTHON_TOOLS.items():
+        check_cmd = info["command"]
         if not command_exists(check_cmd):
-            missing_tools.append(f"     - {tool}: `{install_cmd}` (add to dev dependencies)")
+            missing_tools.append(f"     - {tool}: `{info['install']}` (add to dev dependencies)")
             all_tools_ok = False
     return missing_tools, all_tools_ok
 
 
-def _check_js_tools() -> tuple[list[str], bool]:
-    """Check JavaScript/TypeScript tools and return any missing items and overall status."""
+def _has_js_or_ts_files():
+    """Check if the current directory has JavaScript or TypeScript files."""
+    js_patterns = ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.mjs", "**/*.cjs", "**/*.mts"]
+    for pattern in js_patterns:
+        if glob.glob(pattern, recursive=True):
+            return True
+    return False
+
+
+def _copy_eslint_config():
+    """Copy ESLint config file if it doesn't exist and JS/TS files are present."""
+    if not _has_js_or_ts_files():
+        return
+
+    eslint_config = "eslint.config.js"
+    if os.path.exists(eslint_config):
+        click.echo(f"Found existing {eslint_config}, skipping...")
+        return
+
+    try:
+        shutil.copy(str(get_template_path() / eslint_config), eslint_config)
+        click.echo(f"Created {eslint_config} with default configuration")
+    except Exception as e:
+        click.echo(f"Warning: Could not create {eslint_config}: {e}", err=True)
+
+
+def _install_js_tools():
+    """Install JavaScript/TypeScript tools globally if needed."""
+    if not _has_js_or_ts_files():
+        return
+
+    if not command_exists("npm"):
+        click.echo("\n⚠️  npm not found. Please install Node.js to use JavaScript/TypeScript features.")
+        return
+
+    click.echo("\n📦 Installing JavaScript/TypeScript tools globally...")
     missing_tools = []
-    all_tools_ok = True
 
-    # Check Prettier
-    if not command_exists("prettier"):
-        missing_tools.append(f"     - prettier: `{JS_TOOLS['prettier']}`")
-        all_tools_ok = False
-    if not find_config_file(PRETTIERRC_GLOB):
-        missing_tools.append(f"     - Prettier config: Create a '{PRETTIERRC_GLOB}' file (e.g., .prettierrc.json)")
-        all_tools_ok = False
+    for tool, info in JS_TOOLS.items():
+        if not command_exists(info["command"]):
+            missing_tools.append(tool)
+            try:
+                click.echo(f"\n🔧 Installing {tool}...")
+                success, stdout, stderr = run_command(["npm", "install", "-g", *info["packages"]])
+                if not success:
+                    click.echo(f"⚠️  Failed to install {tool}. Error: {stderr}", err=True)
+            except Exception as e:
+                click.echo(f"⚠️  Error installing {tool}: {e}", err=True)
 
-    # Check ESLint
-    if not command_exists("eslint"):
-        missing_tools.append(f"     - eslint: `{JS_TOOLS['eslint']}`")
-        all_tools_ok = False
-    if not find_config_file(ESLINTRC_GLOB):
-        missing_tools.append(f"     - ESLint config: Create an '{ESLINTRC_GLOB}' file (e.g., .eslintrc.js)")
-        all_tools_ok = False
+    if not missing_tools:
+        click.echo("✅ All JavaScript/TypeScript tools are already installed.")
+    else:
+        click.echo("\n✅ Finished installing JavaScript/TypeScript tools.")
 
-    return missing_tools, all_tools_ok
+
+def _check_js_ts_tools():
+    """Check for JavaScript/TypeScript tools."""
+    if not _has_js_or_ts_files():
+        return
+
+    click.echo("\n   📝 JavaScript/TypeScript tools:")
+    missing_tools = []
+
+    # Check for required JS/TS tools
+    for tool, info in JS_TOOLS.items():
+        if not command_exists(info["command"]):
+            missing_tools.append(f"   - {tool}: {info['install']}")
+
+    if missing_tools:
+        click.echo("   ⚠️  Missing tools:")
+        for tool in missing_tools:
+            click.echo(tool)
+    else:
+        click.echo("   ✅ All required JS/TS tools are installed.")
 
 
 def _print_dependency_instructions():
     """Checks for common tools and prints installation instructions if missing."""
-    click.echo("\n Priting Instructions:")
-    click.echo("ℹ️  Checking for required tools and configurations...")
+    click.echo("\n ℹ️  Checking for required tools and configurations...")
 
     # Check Python tools
-    missing_py_tools, py_tools_ok = _check_python_tools()
-    if missing_py_tools:
-        click.secho("\n   🐍 Python Tools:", fg="cyan")
-        for item in missing_py_tools:
-            click.echo(item)
-        click.echo("      (Add these to your project's dev dependencies, e.g., in `pyproject.toml`)")
+    click.echo("\n   🐍 Python tools:")
+    missing_tools = []
+    for tool, info in PYTHON_TOOLS.items():
+        if not command_exists(info["command"]):
+            missing_tools.append(f"   - {tool}: {info['install']}")
 
-    # Check JS/TS tools if package.json exists
-    if PACKAGE_JSON.exists():
-        click.secho("\n   📜 JavaScript/TypeScript Tools (package.json detected):", fg="cyan")
-        missing_js_tools, js_tools_ok = _check_js_tools()
-        if missing_js_tools:
-            for item in missing_js_tools:
-                click.echo(item)
-            click.echo("      (Install via npm/yarn and configure according to your project needs)")
-        else:
-            click.echo("     ✅ Prettier & ESLint commands and config files seem present.")
-            click.echo("        (Ensure they are configured correctly in .prettierrc.* and .eslintrc.*)")
+    if missing_tools:
+        click.echo("   ⚠️  Missing tools:")
+        for tool in missing_tools:
+            click.echo(tool)
     else:
-        click.echo("\n   📜 No package.json detected, skipping JS/TS tool check.")
+        click.echo("   ✅ All required Python tools are installed.")
 
-    click.echo("\n👉 You can verify the setup using: `quick-git-hooks check`")
+    # Check JS/TS tools if needed
+    _check_js_ts_tools()
 
 
 def _check_git_repo() -> tuple[list[str], list[str], list[str], bool]:
@@ -250,21 +294,15 @@ def _check_tools() -> tuple[list[str], list[str], list[str], bool]:
     issues_found = False
 
     # Python Tools Check
-    for tool in PYTHON_TOOLS:
-        check_cmd = "cz" if tool == "commitizen" else tool
+    for tool, info in PYTHON_TOOLS.items():
+        check_cmd = info["command"]
         if command_exists(check_cmd):
             success_msgs.append(f"✅ {tool} command found.")
         else:
-            warning_msgs.append(f"⚠️ {tool} command not found. Install: `{PYTHON_TOOLS[tool]}`")
+            warning_msgs.append(f"⚠️ {tool} command not found. Install: `{info['install']}`")
 
     # JS/TS Tools Check
-    if PACKAGE_JSON.exists():
-        click.echo("   Checking JS/TS tools...")
-        missing_js_tools, _ = _check_js_tools()
-        if missing_js_tools:
-            warning_msgs.extend(missing_js_tools)
-    else:
-        click.echo("   Skipping JS/TS tool check (no package.json).")
+    _check_js_ts_tools()
 
     return success_msgs, warning_msgs, error_msgs, issues_found
 
@@ -319,21 +357,8 @@ def _run_hooks() -> bool:
     return True
 
 
-# --- CLI Command Group ---
-@click.group()
-@click.version_option(package_name="quick_git_hooks")
-def cli():
-    """Quick Git Hooks - Easily set up and manage git hooks."""
-    pass
-
-
-# --- Setup Command ---
-
-
-@cli.command()
-@click.option("--overwrite", is_flag=True, help="Overwrite existing config and guide files if they exist.")
-def setup(overwrite: bool):
-    """Sets up pre-commit hooks for Python, JS, and TS projects."""
+def _setup_hooks(overwrite=False):
+    """Set up pre-commit hooks in the current Git repository."""
     click.echo("🚀 Starting Git hooks setup...")
 
     # Check if we're in a git repo
@@ -357,6 +382,12 @@ def setup(overwrite: bool):
         click.secho("❌ Failed to install some hooks. Please check the errors above.", fg="red")
         sys.exit(1)
 
+    # Copy ESLint config if needed (after pre-commit config)
+    _copy_eslint_config()
+
+    # Install JS/TS tools if needed
+    _install_js_tools()
+
     # Print dependency instructions for any remaining tools
     _print_dependency_instructions()
 
@@ -372,6 +403,24 @@ def setup(overwrite: bool):
 
     click.echo("\n💡 Tip: You can customize the hooks by editing .pre-commit-config.yaml")
     click.echo("   After customizing, run 'pre-commit install' to apply your changes.")
+
+
+# --- CLI Command Group ---
+@click.group()
+@click.version_option(package_name="quick_git_hooks")
+def cli():
+    """Quick Git Hooks - Easily set up and manage git hooks."""
+    pass
+
+
+# --- Setup Command ---
+
+
+@cli.command()
+@click.option("--overwrite", is_flag=True, help="Overwrite existing config and guide files if they exist.")
+def setup(overwrite: bool):
+    """Sets up pre-commit hooks for Python, JS, and TS projects."""
+    _setup_hooks(overwrite)
 
 
 # --- Check Command ---

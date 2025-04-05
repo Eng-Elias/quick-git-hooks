@@ -55,21 +55,17 @@ repos:
         types_or:
           [javascript, jsx, ts, tsx, css, scss, html, json, yaml, markdown]
         # Requires: npm/yarn install --save-dev prettier
-        # Requires: .prettierrc.* configuration file
 
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v9.6.0 # Or pin to your project's version
+    rev: v9.24.0 # Updated to latest version
     hooks:
       - id: eslint
         types_or: [javascript, jsx, ts, tsx]
-        # Requires: npm/yarn install --save-dev eslint [plugins/parsers...]
-        # Requires: .eslintrc.* configuration file
-        # Add necessary parser/plugins (e.g., @typescript-eslint/parser) here:
-        # additional_dependencies: ['@typescript-eslint/parser@latest', '@typescript-eslint/eslint-plugin@latest']
+        # Using new flat config format (eslint.config.js)
+        # Will be automatically created if JS/TS files are detected
         args: [--fix] # Attempt to fix issues automatically
 
   # Branch naming convention hook (Example)
-  # ... (hook remains the same) ...
   - repo: local
     hooks:
       - id: branch-name-check
@@ -80,7 +76,6 @@ repos:
         pass_filenames: false
 
   # Commit message hook (Requires commitizen)
-  # ... (hook remains the same) ...
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.2.2
     hooks:
