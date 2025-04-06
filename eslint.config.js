@@ -6,11 +6,10 @@
 export default [
   {
     ignores: [
-      // Add files/directories to ignore here, for example:
-      // "**/node_modules/*",
-      // "**/dist/*",
-      // "**/build/*",
-      // "**/*.min.js",
+      // Add files/directories to ignore here:
+      "**/dist/*",
+      "**/build/*",
+      "**/*.*.min.*",
       "**/*.config.js",
     ],
   },

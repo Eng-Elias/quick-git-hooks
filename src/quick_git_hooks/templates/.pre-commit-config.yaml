@@ -54,7 +54,14 @@ repos:
       - id: prettier
         types_or:
           [javascript, jsx, ts, tsx, css, scss, html, json, yaml, markdown]
-        # Requires: npm/yarn install --save-dev prettier
+        # Exclude files using exclude pattern
+        exclude: |
+          (?x)^(
+              .*\.min\.(js|css) |  # Ignore minified files
+              dist/.* |            # Ignore dist directory
+              build/.* |           # Ignore build directory
+              .*\.config\.js       # Ignore config files
+          )$
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.24.0 # Updated to latest version
@@ -64,6 +71,14 @@ repos:
         # Using new flat config format (eslint.config.js)
         # Will be automatically created if JS/TS files are detected
         args: [--fix] # Attempt to fix issues automatically
+        # Exclude files using exclude pattern
+        exclude: |
+          (?x)^(
+              .*\.min\.(js|css) |  # Ignore minified files
+              dist/.* |            # Ignore dist directory
+              build/.* |           # Ignore build directory
+              .*\.config\.js       # Ignore config files
+          )$
 
   # Branch naming convention hook (Example)
   - repo: local
