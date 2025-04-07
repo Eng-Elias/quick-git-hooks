@@ -74,15 +74,15 @@ def _install_python_tools() -> bool:
     """Install required Python tools if missing. Returns True if all installations were successful."""
     success = True
 
-    # Install commitizen if missing
-    if not command_exists("cz"):
-        click.echo("   Installing commitizen...")
-        ok, _, err = run_command(["pip", "install", "commitizen"])
-        if not ok:
-            click.secho(f"   ⚠️ Failed to install commitizen: {err}", fg="yellow")
-            success = False
-        else:
-            click.secho("   ✅ Installed commitizen", fg="green")
+    for tool, info in PYTHON_TOOLS.items():
+        if not command_exists(info["command"]):
+            click.echo(f"   Installing {tool}...")
+            ok, _, err = run_command(["pip", "install", *info["packages"]])
+            if not ok:
+                click.secho(f"   ⚠️ Failed to install {tool}: {err}", fg="yellow")
+                success = False
+            else:
+                click.secho(f"   ✅ Installed {tool}", fg="green")
 
     return success
 
@@ -111,18 +111,6 @@ def _install_hooks() -> bool:
             click.secho(f"   ⚠️ Failed to install {hook_type} hook: {err_out}", fg="yellow")
 
     return success
-
-
-def _check_python_tools() -> tuple[list[str], bool]:
-    """Check Python tools and return any missing tools and overall status."""
-    missing_tools = []
-    all_tools_ok = True
-    for tool, info in PYTHON_TOOLS.items():
-        check_cmd = info["command"]
-        if not command_exists(check_cmd):
-            missing_tools.append(f"     - {tool}: `{info['install']}` (add to dev dependencies)")
-            all_tools_ok = False
-    return missing_tools, all_tools_ok
 
 
 def _has_js_or_ts_files():
@@ -180,10 +168,43 @@ def _install_js_tools():
         click.echo("\n✅ Finished installing JavaScript/TypeScript tools.")
 
 
-def _check_js_ts_tools():
-    """Check for JavaScript/TypeScript tools."""
+def _check_python_tools() -> tuple[list[str], list[str], list[str], bool]:
+    """Check Python tools and return messages and status."""
+    success_msgs = []
+    warning_msgs = []
+    error_msgs = []
+    issues_found = False
+
+    click.echo("\n   🐍 Python tools:")
+    missing_tools = []
+
+    for tool, info in PYTHON_TOOLS.items():
+        check_cmd = info["command"]
+        if command_exists(check_cmd):
+            success_msgs.append(f"✅ {tool} command found.")
+        else:
+            missing_tools.append(f"   - {tool}: {info['install']}")
+            warning_msgs.append(f"⚠️ {tool} command not found. Install: `{info['install']}`")
+            issues_found = True
+
+    if missing_tools:
+        click.echo("\n   ⚠️ Missing tools:")
+        for tool in missing_tools:
+            click.echo(tool)
+    else:
+        click.echo("   ✅ All required Python tools are installed.")
+
+    return success_msgs, warning_msgs, error_msgs, issues_found
+
+
+def _check_js_ts_tools() -> tuple[list[str], list[str], list[str], bool]:
+    success_msgs = []
+    warning_msgs = []
+    error_msgs = []
+    issues_found = False
+
     if not _has_js_or_ts_files():
-        return
+        return success_msgs, warning_msgs, error_msgs, issues_found
 
     click.echo("\n   📝 JavaScript/TypeScript tools:")
     missing_tools = []
@@ -200,27 +221,7 @@ def _check_js_ts_tools():
     else:
         click.echo("   ✅ All required JS/TS tools are installed.")
 
-
-def _print_dependency_instructions():
-    """Checks for common tools and prints installation instructions if missing."""
-    click.echo("\n ℹ️  Checking for required tools and configurations...")
-
-    # Check Python tools
-    click.echo("\n   🐍 Python tools:")
-    missing_tools = []
-    for tool, info in PYTHON_TOOLS.items():
-        if not command_exists(info["command"]):
-            missing_tools.append(f"   - {tool}: {info['install']}")
-
-    if missing_tools:
-        click.echo("   ⚠️  Missing tools:")
-        for tool in missing_tools:
-            click.echo(tool)
-    else:
-        click.echo("   ✅ All required Python tools are installed.")
-
-    # Check JS/TS tools if needed
-    _check_js_ts_tools()
+    return success_msgs, warning_msgs, error_msgs, issues_found
 
 
 def _check_git_repo() -> tuple[list[str], list[str], list[str], bool]:
@@ -293,16 +294,19 @@ def _check_tools() -> tuple[list[str], list[str], list[str], bool]:
     error_msgs = []
     issues_found = False
 
-    # Python Tools Check
-    for tool, info in PYTHON_TOOLS.items():
-        check_cmd = info["command"]
-        if command_exists(check_cmd):
-            success_msgs.append(f"✅ {tool} command found.")
-        else:
-            warning_msgs.append(f"⚠️ {tool} command not found. Install: `{info['install']}`")
+    # Check Python tools
+    py_success_msgs, py_warning_msgs, py_error_msgs, py_issues_found = _check_python_tools()
+    success_msgs.extend(py_success_msgs)
+    warning_msgs.extend(py_warning_msgs)
+    error_msgs.extend(py_error_msgs)
+    issues_found = issues_found or py_issues_found
 
-    # JS/TS Tools Check
-    _check_js_ts_tools()
+    # Check JS/TS tools
+    js_success_msgs, js_warning_msgs, js_error_msgs, js_issues_found = _check_js_ts_tools()
+    success_msgs.extend(js_success_msgs)
+    warning_msgs.extend(js_warning_msgs)
+    error_msgs.extend(js_error_msgs)
+    issues_found = issues_found or js_issues_found
 
     return success_msgs, warning_msgs, error_msgs, issues_found
 
@@ -387,9 +391,6 @@ def _setup_hooks(overwrite=False):
 
     # Install JS/TS tools if needed
     _install_js_tools()
-
-    # Print dependency instructions for any remaining tools
-    _print_dependency_instructions()
 
     # Final success message
     click.secho("\n🎉 Setup process complete!", fg="green")
