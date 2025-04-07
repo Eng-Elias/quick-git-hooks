@@ -9,11 +9,15 @@ A CLI tool to quickly set up and manage pre-commit Git hooks for Python, JavaScr
 - 📝 Comprehensive documentation and guides
 - ✨ Pre-configured hooks for:
   - Code formatting (black, prettier)
-  - Linting (flake8, eslint)
+  - Linting (flake8, eslint with flat config)
   - Import sorting (isort)
   - Commit message formatting (commitizen)
   - Branch naming conventions
 - 🔄 Easy hook management and customization
+- 🛠️ Modern tooling support:
+  - ESLint flat config (eslint.config.js)
+  - Automatic tool installation
+  - Smart file ignoring (.prettierignore)
 
 ## Installation
 
@@ -39,8 +43,11 @@ pip install quick-git-hooks
 
    - Create `.pre-commit-config.yaml` with recommended hooks
    - Create `GIT_HOOKS_GUIDE.md` with detailed documentation
+   - For JS/TS projects:
+     - Create `eslint.config.js` with modern flat config
+     - Install required tools globally (prettier, eslint)
    - Install pre-commit hooks
-   - Install required tools (like commitizen)
+   - Install required Python tools
    - Provide instructions for any missing dependencies
 
 3. Check the setup status:
@@ -90,7 +97,7 @@ git push --no-verify   # Skip pre-push hooks
   - flake8 (Python linting)
   - isort (Python import sorting)
   - prettier (JS/TS formatting)
-  - eslint (JS/TS linting)
+  - eslint (JS/TS linting with modern flat config)
 
 - **Commit Quality**
 
@@ -104,6 +111,16 @@ git push --no-verify   # Skip pre-push hooks
   - Protected branch checks
 
 See `GIT_HOOKS_GUIDE.md` for detailed configuration options.
+
+## Configuration Files
+
+When JS/TS files are detected, the following files are automatically created:
+
+- `eslint.config.js`: Modern ESLint flat configuration with:
+  - JavaScript and TypeScript support
+  - Recommended rules and best practices
+  - Customizable ignore patterns
+  - TypeScript-specific rules when needed
 
 ## Development
 
@@ -144,7 +161,7 @@ See `GIT_HOOKS_GUIDE.md` for detailed configuration options.
 - Python ≥ 3.7
 - Git
 - For Python hooks: black, flake8, isort
-- For JS/TS hooks: prettier, eslint
+- For JS/TS hooks: Node.js, npm (for global installation of prettier and eslint)
 - For commit messages: commitizen
 
 ## License
