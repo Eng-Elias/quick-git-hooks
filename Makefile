@@ -25,11 +25,13 @@ install-dev:
 
 build: clean
 	@echo "--- Building package ---"
+	$(PIP) install --upgrade build
 	$(PYTHON) -m build
 
 publish: build
 	@echo "--- Publishing to PyPI ---"
 	@echo "Ensure you have twine installed ($(PIP) install twine) and configured."
+	$(PIP) install --upgrade twine
 	$(PYTHON) -m twine upload dist/*
 
 # --- Cleaning Logic ---
